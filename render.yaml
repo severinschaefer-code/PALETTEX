@@ -1,0 +1,15 @@
+
+services:
+  - type: web
+    name: palettex
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SENDINBLUE_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_TO
+        sync: false
