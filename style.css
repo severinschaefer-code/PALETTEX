@@ -1,0 +1,3 @@
+
+html { scroll-behavior: smooth; }
+button:hover { transform: translateY(-1px); transition: all 0.2s ease; }
