@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Palettex – Palettenhandel & Clearing</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/style.css">
-  <script src="js/script.js" defer></script>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
   <!-- Hero Header -->
@@ -48,7 +46,7 @@
         Preise werden individuell nach Prüfung kalkuliert.
       </p>
       <!-- Formular Verkauf / Kauf -->
-      <form id="formHandel" class="space-y-5">
+      <form id="formHandel" class="space-y-5" method="post" action="/api/handel" enctype="multipart/form-data">
         <div class="grid sm:grid-cols-2 gap-5">
           <div><label class="block text-sm font-semibold text-slate-200 mb-1">Vorgang*</label>
             <select name="vorgang" required class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2.5">
@@ -97,7 +95,7 @@
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-8 shadow-xl">
       <h2 class="text-2xl font-bold text-emerald-400 mb-3">💳 Freistellung / Clearing einer Palettenschuld</h2>
       <p class="text-slate-300 mb-6 text-base leading-relaxed font-semibold">Wir stellen Ihre Palettenschuld gegenüber dem angegebenen Lieferanten frei – transparent und rechtssicher dokumentiert.</p>
-      <form id="formClearing" class="space-y-5">
+      <form id="formClearing" class="space-y-5" method="post" action="/api/clearing" enctype="multipart/form-data">
         <div class="grid sm:grid-cols-2 gap-5">
           <div><label class="block text-sm font-semibold text-slate-200 mb-1">Lieferant (Name)*</label><input type="text" name="lieferant" required class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2.5"/></div>
           <div><label class="block text-sm font-semibold text-slate-200 mb-1">Anschrift inkl. PLZ*</label><input type="text" name="lieferantenanschrift" required class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2.5"/></div>
@@ -125,5 +123,6 @@
     © 2025 PAVECON GmbH · Palettex.de · All rights reserved.<br/>
     <a href="#" class="text-orange-400 hover:underline">Datenschutz</a>
   </footer>
+  <script src="script.js"></script>
 </body>
 </html>
