@@ -1,12 +1,13 @@
 import express from "express";
 import multer from "multer";
 import cors from "cors";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import Brevo from "@getbrevo/brevo";
 
 dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -14,48 +15,49 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Static files (serve index.html, css, js)
 app.use(express.static(__dirname));
 
-// File upload setup
 const upload = multer({ dest: path.join(__dirname, "uploads") });
 
-// 🔧 SMTP Transport über Brevo
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false, // TLS wird automatisch aktiviert
-  auth: {
-    user: process.env.SMTP_USER, // z. B. 9b2481001@smtp-brevo.com
-    pass: process.env.SMTP_PASS, // dein Brevo-SMTP-Schlüssel
-  },
-});
+// --- BREVO API KONFIG ---
+const brevoApi = new Brevo.TransactionalEmailsApi();
+brevoApi.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
-// Formatierung des E-Mail-Inhalts
+// --- Hilfsfunktionen ---
 function formatBody(body) {
   return Object.entries(body)
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n");
 }
 
-// Mail an dich (Admin)
-async function sendMailToOwner(subject, bodyText, file) {
-  const mailOptions = {
-    from: process.env.MAIL_FROM,
-    to: process.env.MAIL_TO,
-    subject,
-    text: bodyText,
-    attachments: file ? [{ filename: file.originalname, path: file.path }] : [],
-  };
-  await transporter.sendMail(mailOptions);
+// E-Mail an Betreiber (Palettex)
+async function sendMailToOwner(subject, text, file) {
+  const email = new Brevo.SendSmtpEmail();
+  email.sender = { name: "Palettex.de", email: process.env.MAIL_FROM };
+  email.to = [{ email: process.env.MAIL_TO }];
+  email.subject = subject;
+  email.textContent = text;
+
+  if (file) {
+    email.attachment = [
+      {
+        name: file.originalname,
+        url: `file://${file.path}`,
+      },
+    ];
+  }
+
+  return brevoApi.sendTransacEmail(email);
 }
 
-// Mail an Kunden (Bestätigung)
+// E-Mail an Kunden (Bestätigung)
 async function sendMailToCustomer(toAddress) {
   if (!toAddress) return;
-  const subject = "Ihre Anfrage bei Palettex.de";
-  const text = `Sehr geehrte Damen und Herren,
+  const email = new Brevo.SendSmtpEmail();
+  email.sender = { name: "Palettex.de", email: process.env.MAIL_FROM };
+  email.to = [{ email: toAddress }];
+  email.subject = "Ihre Anfrage bei Palettex.de";
+  email.textContent = `Sehr geehrte Damen und Herren,
 
 vielen Dank für Ihre Anfrage über Palettex.de.
 Wir haben Ihre Angaben erhalten und werden diese schnellstmöglich bearbeiten.
@@ -65,44 +67,38 @@ Ihr Palettex-Team
 
 —
 Palettex.de`;
-  await transporter.sendMail({
-    from: process.env.MAIL_FROM,
-    to: toAddress,
-    subject,
-    text,
-  });
+
+  return brevoApi.sendTransacEmail(email);
 }
 
-// 📦 Route 1: Palettenhandel
+// --- ROUTEN ---
 app.post("/api/handel", upload.single("upload"), async (req, res) => {
   const text = "Neue Paletten-Anfrage (Verkauf / Kauf):\n\n" + formatBody(req.body);
   try {
-    await sendMailToOwner("Neue Paletten-Anfrage", text, req.file);
+    await sendMailToOwner("Neue Paletten-Anfrage (Handel)", text, req.file);
     await sendMailToCustomer(req.body.email);
     res.json({ message: "E-Mail erfolgreich versendet." });
   } catch (err) {
-    console.error("Fehler beim Mailversand (Handel):", err);
-    res.status(500).json({ message: "Fehler beim Mailversand." });
+    console.error("❌ Fehler beim Mailversand (Handel):", err);
+    res.status(500).json({ message: "Fehler beim Mailversand.", error: err.message });
   }
 });
 
-// 📦 Route 2: Freistellung (Clearing)
 app.post("/api/clearing", upload.single("upload"), async (req, res) => {
-  const text = "Neue Freistellungs-Anfrage:\n\n" + formatBody(req.body);
+  const text = "Neue Freistellungs-Anfrage (Clearing):\n\n" + formatBody(req.body);
   try {
     await sendMailToOwner("Neue Paletten-Freistellung", text, req.file);
     await sendMailToCustomer(req.body.email);
     res.json({ message: "E-Mail erfolgreich versendet." });
   } catch (err) {
-    console.error("Fehler beim Mailversand (Clearing):", err);
-    res.status(500).json({ message: "Fehler beim Mailversand." });
+    console.error("❌ Fehler beim Mailversand (Clearing):", err);
+    res.status(500).json({ message: "Fehler beim Mailversand.", error: err.message });
   }
 });
 
-// Root Route (index.html bereitstellen)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Palettex Server läuft auf Port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Palettex API läuft auf Port ${PORT}`));
