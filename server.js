@@ -11,88 +11,83 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const upload = multer({ dest: "uploads/" });
+// --- Upload (In-Memory, kein temp-FS) ---
+const upload = multer({ storage: multer.memoryStorage() });
 
-// 📬 Brevo Konfiguration
-const defaultClient = Brevo.ApiClient.instance;
-const apiKey = defaultClient.authentications["api-key"];
-apiKey.apiKey = process.env.BREVO_API_KEY;
+// --- Brevo API Konfiguration ---
+const brevoApi = new Brevo.TransactionalEmailsApi();
+brevoApi.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
-const apiInstance = new Brevo.TransactionalEmailsApi();
-
-// 📄 Body formatieren
+// --- Helper ---
 function formatBody(body) {
   return Object.entries(body)
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n");
 }
 
-// 🟠 Anfrage – Palettenhandel
+async function sendMailToOwner(subject, text, file) {
+  const email = new Brevo.SendSmtpEmail();
+  email.sender = { name: "Palettex.de", email: process.env.MAIL_FROM };
+  email.to = [{ email: process.env.MAIL_TO }];
+  email.subject = subject;
+  email.textContent = text;
+
+  if (file) {
+    email.attachment = [
+      {
+        name: file.originalname,
+        content: file.buffer.toString("base64"),
+      },
+    ];
+  }
+  return brevoApi.sendTransacEmail(email);
+}
+
+async function sendMailToCustomer(toAddress) {
+  if (!toAddress) return;
+  const email = new Brevo.SendSmtpEmail();
+  email.sender = { name: "Palettex.de", email: process.env.MAIL_FROM };
+  email.to = [{ email: toAddress }];
+  email.subject = "Ihre Anfrage bei Palettex.de";
+  email.textContent = `Sehr geehrte Damen und Herren,
+
+vielen Dank für Ihre Anfrage über Palettex.de.
+Wir haben Ihre Angaben erhalten und werden diese schnellstmöglich bearbeiten.
+
+Mit freundlichen Grüßen
+Ihr Palettex-Team
+—
+Palettex.de`;
+
+  return brevoApi.sendTransacEmail(email);
+}
+
+// --- ROUTEN ---
 app.post("/api/handel", upload.single("upload"), async (req, res) => {
-  const text =
-    "Neue Paletten-Anfrage (Verkauf / Kauf):\n\n" + formatBody(req.body);
-
+  const text = "Neue Paletten-Anfrage (Verkauf / Kauf):\n\n" + formatBody(req.body);
   try {
-    // Mail an Betreiber
-    await apiInstance.sendTransacEmail({
-      sender: { email: process.env.MAIL_FROM, name: "Palettex.de" },
-      to: [{ email: process.env.MAIL_TO }],
-      subject: "Neue Paletten-Anfrage (Handel)",
-      textContent: text,
-    });
-
-    // Bestätigung an Kunde
-    if (req.body.email) {
-      await apiInstance.sendTransacEmail({
-        sender: { email: process.env.MAIL_FROM, name: "Palettex.de" },
-        to: [{ email: req.body.email }],
-        subject: "Ihre Anfrage bei Palettex.de",
-        textContent:
-          "Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihre Anfrage. Wir haben diese erhalten und werden sie schnellstmöglich bearbeiten.\n\nMit freundlichen Grüßen\nIhr Palettex-Team\nwww.palettex.de",
-      });
-    }
-
+    await sendMailToOwner("Neue Paletten-Anfrage (Handel)", text, req.file);
+    await sendMailToCustomer(req.body.email);
     res.json({ message: "E-Mail erfolgreich versendet." });
-  } catch (error) {
-    console.error("❌ Fehler beim Mailversand (Handel):", error);
-    res.status(500).json({ message: "Fehler beim Mailversand." });
+  } catch (err) {
+    console.error("❌ Fehler (Handel):", err);
+    res.status(500).json({ message: "Fehler beim Mailversand.", error: err.message });
   }
 });
 
-// 🟢 Anfrage – Freistellung / Clearing
 app.post("/api/clearing", upload.single("upload"), async (req, res) => {
-  const text =
-    "Neue Freistellungs-Anfrage (Clearing):\n\n" + formatBody(req.body);
-
+  const text = "Neue Freistellungs-Anfrage (Clearing):\n\n" + formatBody(req.body);
   try {
-    await apiInstance.sendTransacEmail({
-      sender: { email: process.env.MAIL_FROM, name: "Palettex.de" },
-      to: [{ email: process.env.MAIL_TO }],
-      subject: "Neue Paletten-Freistellung",
-      textContent: text,
-    });
-
-    if (req.body.email) {
-      await apiInstance.sendTransacEmail({
-        sender: { email: process.env.MAIL_FROM, name: "Palettex.de" },
-        to: [{ email: req.body.email }],
-        subject: "Ihre Freistellungsanfrage bei Palettex.de",
-        textContent:
-          "Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihre Freistellungsanfrage. Wir werden diese prüfen und uns zeitnah bei Ihnen melden.\n\nMit freundlichen Grüßen\nIhr Palettex-Team\nwww.palettex.de",
-      });
-    }
-
+    await sendMailToOwner("Neue Paletten-Freistellung", text, req.file);
+    await sendMailToCustomer(req.body.email);
     res.json({ message: "E-Mail erfolgreich versendet." });
-  } catch (error) {
-    console.error("❌ Fehler beim Mailversand (Clearing):", error);
-    res.status(500).json({ message: "Fehler beim Mailversand." });
+  } catch (err) {
+    console.error("❌ Fehler (Clearing):", err);
+    res.status(500).json({ message: "Fehler beim Mailversand.", error: err.message });
   }
 });
 
-// Health Check
-app.get("/", (_, res) => res.send("✅ Palettex Backend (Brevo API) läuft!"));
+app.get("/", (req, res) => res.send("✅ Palettex Backend läuft auf Koyeb."));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🚀 Server gestartet auf Port ${PORT}`)
-);
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`🚀 API aktiv auf Port ${PORT}`));
