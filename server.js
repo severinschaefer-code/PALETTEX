@@ -79,7 +79,7 @@ app.post("/api/clearing", upload.single("upload"), async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.send("✅ Palettex Backend läuft auf Koyeb."));
+app.get("/", (req, res) => res.send("✅ Palettex Backend läuft auf Koyeb (Dockerfile Build)."));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 API aktiv auf Port ${PORT}`));

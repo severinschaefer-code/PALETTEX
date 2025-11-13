@@ -1,11 +1,10 @@
 {
   "name": "palettex-backend",
-  "version": "1.0.3",
-  "description": "Backend für Palettex.de (Brevo API, Koyeb Deploy v4 Fix)",
+  "version": "1.0.5",
+  "description": "Backend für Palettex.de (Brevo API, Docker/Koyeb Deploy)",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "heroku-prebuild": "npm install",
     "start": "node server.js"
   },
   "engines": {
