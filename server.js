@@ -11,14 +11,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Upload (In-Memory, kein temp-FS) ---
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- Brevo API Konfiguration ---
 const brevoApi = new Brevo.TransactionalEmailsApi();
 brevoApi.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
-// --- Helper ---
 function formatBody(body) {
   return Object.entries(body)
     .map(([key, value]) => `${key}: ${value}`)
@@ -31,14 +28,11 @@ async function sendMailToOwner(subject, text, file) {
   email.to = [{ email: process.env.MAIL_TO }];
   email.subject = subject;
   email.textContent = text;
-
   if (file) {
-    email.attachment = [
-      {
-        name: file.originalname,
-        content: file.buffer.toString("base64"),
-      },
-    ];
+    email.attachment = [{
+      name: file.originalname,
+      content: file.buffer.toString("base64")
+    }];
   }
   return brevoApi.sendTransacEmail(email);
 }
@@ -58,11 +52,9 @@ Mit freundlichen Grüßen
 Ihr Palettex-Team
 —
 Palettex.de`;
-
   return brevoApi.sendTransacEmail(email);
 }
 
-// --- ROUTEN ---
 app.post("/api/handel", upload.single("upload"), async (req, res) => {
   const text = "Neue Paletten-Anfrage (Verkauf / Kauf):\n\n" + formatBody(req.body);
   try {
